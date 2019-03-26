@@ -34,13 +34,15 @@
 -define(ACCOUNT_VSN_2, 2). %% {Flags, Nonce, Balance, GA_Contract}
 -define(ACCOUNT_TYPE, account).
 
+-type fun_hash() :: <<_:256>>.
+
 -record(account, {
-          id                 :: aeser_id:id(),
-          balance = 0        :: non_neg_integer(),
-          nonce = 0          :: non_neg_integer(),
-          flags = 0          :: non_neg_integer(),  %% NOTE: not yet in use
-          ga_contract = <<>> :: <<>> | aec_keys:pubkey(),
-          ga_auth_fun = <<>> :: binary() }).
+          id          :: aeser_id:id(),
+          balance = 0 :: non_neg_integer(),
+          nonce = 0   :: non_neg_integer(),
+          flags = 0   :: non_neg_integer(),  %% NOTE: not yet in use
+          ga_contract :: undefined | aeser_id:id(),
+          ga_auth_fun :: undefined | fun_hash() }).
 
 -opaque account() :: #account{}.
 -export_type([account/0, deterministic_account_binary_with_pubkey/0]).
@@ -72,11 +74,11 @@ nonce(#account{nonce = Nonce}) ->
 flags(#account{flags = Flags}) ->
     Flags.
 
--spec ga_contract(account()) -> <<>> | aec_keys:pubkey().
+-spec ga_contract(account()) -> undefined | aeser_id:id().
 ga_contract(#account{ga_contract = GAContract}) ->
     GAContract.
 
--spec ga_auth_fun(account()) -> binary().
+-spec ga_auth_fun(account()) -> undefined | fun_hash().
 ga_auth_fun(#account{ga_auth_fun = GAAuthFun}) ->
     GAAuthFun.
 
@@ -85,8 +87,9 @@ ga_auth_fun(#account{ga_auth_fun = GAAuthFun}) ->
 set_nonce(Account, NewNonce) ->
     Account#account{nonce = NewNonce}.
 
--spec attach_ga_contract(account(), aec_keys:pubkey(), binary()) -> {ok, account()}.
-attach_ga_contract(Account, GAContract, GAAuthFun) ->
+-spec attach_ga_contract(account(), aeser_id:id(), fun_hash()) -> {ok, account()}.
+attach_ga_contract(Account, GAContract, <<_:256>> = GAAuthFun) ->
+    contract = aeser_id:specialize_type(GAContract),
     {ok, Account#account{ga_contract = GAContract,
                          ga_auth_fun = GAAuthFun }}.
 
@@ -106,8 +109,8 @@ spend_without_nonce_bump(#account{balance = Balance0} = Account0, Amount) ->
     {ok, Account0#account{balance = Balance0 - Amount}}.
 
 -spec type(account()) -> basic | generalized.
-type(#account{ ga_contract = <<>> }) -> basic;
-type(#account{})                     -> generalized.
+type(#account{ ga_contract = undefined }) -> basic;
+type(#account{})                          -> generalized.
 
 is_legal_at_height(Account, Height) ->
     case type(Account) of
@@ -135,7 +138,6 @@ serialize_generalized(Account) ->
       ?ACCOUNT_TYPE, ?ACCOUNT_VSN_2,
       serialization_template(?ACCOUNT_VSN_2),
       [ {flags, flags(Account)}
-      , {nonce, nonce(Account)}
       , {balance, balance(Account)}
       , {ga_contract, ga_contract(Account)}
       , {ga_auth_fun, ga_auth_fun(Account)}
@@ -155,7 +157,6 @@ deserialize(Pubkey, SerializedAccount) ->
                     };
         {?ACCOUNT_TYPE = Type, ?ACCOUNT_VSN_2 = Vsn, _Rest} ->
             [ {flags, Flags}
-            , {nonce, Nonce}
             , {balance, Balance}
             , {ga_contract, GAContract}
             , {ga_auth_fun, GAAuthFun}
@@ -163,7 +164,6 @@ deserialize(Pubkey, SerializedAccount) ->
                     Type, Vsn, serialization_template(Vsn), SerializedAccount),
             #account{ id = aeser_id:create(account, Pubkey)
                     , balance = Balance
-                    , nonce = Nonce
                     , flags = Flags
                     , ga_contract = GAContract
                     , ga_auth_fun = GAAuthFun
@@ -176,9 +176,8 @@ serialization_template(?ACCOUNT_VSN_1) ->
     ];
 serialization_template(?ACCOUNT_VSN_2) ->
     [ {flags, int}
-    , {nonce, int}
     , {balance, int}
-    , {ga_contract, binary}
+    , {ga_contract, id}
     , {ga_auth_fun, binary}
     ].
 

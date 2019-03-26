@@ -950,7 +950,8 @@ ga_meta({OwnerPK, AuthData, ABIVersion, GasLimit, GasPrice, Fee, _InnerTx}, S) -
     assert_ga_account(Account),
     CheckAmount = Fee + GasLimit * GasPrice,
     assert_account_balance(Account, CheckAmount),
-    AuthContractPK = aec_accounts:ga_contract(Account),
+    AuthContract = aec_accounts:ga_contract(Account),
+    {contract, AuthContractPK} = aeser_id:specialize(AuthContract),
     AuthFunHash = aec_accounts:ga_auth_fun(Account),
 
     assert_contract_call_version(AuthContractPK, ABIVersion, S),
@@ -1142,8 +1143,8 @@ ga_attach_init_success(InitCall, Contract, GasLimit, Fee, AuthFun, RollbackS, S)
 ga_attach_success(Call, GasLimit, AuthFun, S) ->
     Refund = (GasLimit - aect_call:gas_used(Call)) * aect_call:gas_price(Call),
     {CallerAccount, S1} = get_account(aect_call:caller_pubkey(Call), S),
-    ContractPK = aect_call:contract_pubkey(Call),
-    {ok, CallerAccount1} = aec_accounts:attach_ga_contract(CallerAccount, ContractPK, AuthFun),
+    Contract = aeser_id:create(contract, aect_call:contract_pubkey(Call)),
+    {ok, CallerAccount1} = aec_accounts:attach_ga_contract(CallerAccount, Contract, AuthFun),
     S2 = account_earn(CallerAccount1, Refund, S1),
     cache_put(call, Call, S2).
 
