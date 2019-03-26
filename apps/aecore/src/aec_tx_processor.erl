@@ -917,11 +917,10 @@ ga_attach({OwnerPubkey, GasLimit, GasPrice, ABIVersion,
                                         SerializedCode, 0),
     ContractPubkey = aect_contracts:pubkey(Contract),
     {CAccount, S3} = ensure_account(ContractPubkey, S2),
-    S4             = account_earn(CAccount, 0, S3),
     OwnerId        = aect_contracts:owner_id(Contract),
-    {InitCall, S5} = run_contract(OwnerId, Contract, GasLimit, GasPrice,
+    {InitCall, S4} = run_contract(OwnerId, Contract, GasLimit, GasPrice,
                                   CallData, OwnerPubkey, _InitAmount = 0,
-                                  _CallStack = [], Nonce, S4),
+                                  _CallStack = [], Nonce, S3),
     case aect_call:return_type(InitCall) of
         error ->
             ga_attach_fail(InitCall, Fee, RollbackS);
@@ -929,7 +928,7 @@ ga_attach({OwnerPubkey, GasLimit, GasPrice, ABIVersion,
             ga_attach_fail(InitCall, Fee, RollbackS);
         ok ->
             ga_attach_init_success(InitCall, Contract, GasLimit,
-                                   Fee, AuthFun, RollbackS, S5)
+                                   Fee, AuthFun, RollbackS, S4)
     end.
 
 ga_meta_op(OwnerPubkey, AuthData, ABIVersion,
